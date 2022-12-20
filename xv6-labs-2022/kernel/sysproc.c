@@ -5,29 +5,64 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
-#include "sysinfo.h"
-
-
-uint64 freemem();
-uint64 proc_num();
-int sys_trace(void){
-  int n;
-  argint(0, &n);
-  myproc()->trace_mask = n;
-  return 0;
+void restore(){
+  struct proc *p = myproc();
+  p->trapframe->ra = p->ra;
+  p->trapframe->sp = p->sp;
+  p->trapframe->gp = p->gp;
+  p->trapframe->tp = p->tp;
+  p->trapframe->t0 = p->t0;
+  p->trapframe->t1 = p->t1;
+  p->trapframe->t2 = p->t2;
+  p->trapframe->s0 = p->s0;
+  p->trapframe->s1 = p->s1;
+  p->trapframe->a0 = p->a0;
+  p->trapframe->a1 = p->a1;
+  p->trapframe->a2 = p->a2;
+  p->trapframe->a3 = p->a3;
+  p->trapframe->a4 = p->a4;
+  p->trapframe->a5 = p->a5;
+  p->trapframe->a6 = p->a6;
+  p->trapframe->a7 = p->a7;
+  p->trapframe->s2 = p->s2;
+  p->trapframe->s3 = p->s3;
+  p->trapframe->s4 = p->s4;
+  p->trapframe->s5 = p->s5;
+  p->trapframe->s6 = p->s6;
+  p->trapframe->s7 = p->s7;
+  p->trapframe->s8 = p->s8;
+  p->trapframe->s9 = p->s9;
+  p->trapframe->s10 = p->s10;
+  p->trapframe->s11 = p->s11;
+  p->trapframe->t3 = p->t3;
+  p->trapframe->t4 = p->t4;
+  p->trapframe->t5 = p->t5;
+  p->trapframe->t6 = p->t6;
 }
-uint64 sys_sysinfo(void) {
-  struct sysinfo info;
-  uint64 addr;
+uint64 sys_sigalarm(void){
+  int ticks;//0
+  uint64 handler;//1
   
-  info.nproc = proc_num();
-  info.id = "20307130340";
-  info.freemem = freemem();
-  argaddr(0, &addr);
-  if(copyout(myproc()->pagetable, addr, (char *)&info, sizeof(info))<0) return -1;
-  printf("my student number is %s\n", info.id);
+  argint(0, &ticks);
+  
+  argaddr(1, &handler);
+  
+  struct proc * p = myproc();
+  p->storea0 = p->trapframe->a0;  
+  p->ticks = ticks;
+  p->handler = handler;  
   return 0;
 }
+
+uint64 sys_sigreturn(void){
+  struct proc *p = myproc();
+  p->trapframe->epc = p->ticks_epc;
+  restore();
+  p->sreturn = 0;
+  //p->trapframe->a0 = 0;
+  return p->trapframe->a0;
+}
+
 uint64
 sys_exit(void)
 {
@@ -88,6 +123,7 @@ sys_sleep(void)
     }
     sleep(&ticks, &tickslock);
   }
+  backtrace();
   release(&tickslock);
   return 0;
 }

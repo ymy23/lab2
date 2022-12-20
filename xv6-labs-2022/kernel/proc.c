@@ -26,25 +26,9 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
-
-uint64 proc_num() {
-  struct proc *p;
-  uint64 count = 0;
-  for(p = proc; p < &proc[NPROC]; p++) {
-    acquire(&p->lock);
-    if(p->state != UNUSED) {
-      count++;
-    }
-    release(&p->lock);
-  }
-  return count;
-}
-
-
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
-
 void
 proc_mapstacks(pagetable_t kpgtbl)
 {
@@ -161,7 +145,8 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  
+  p->ticks = 0;
   return p;
 }
 
@@ -185,7 +170,6 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  p->trace_mask = 0;               //
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -306,7 +290,7 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){//unsuccess
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
     freeproc(np);
     release(&np->lock);
     return -1;
@@ -315,8 +299,6 @@ fork(void)
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
-  //get parent's mask
-  np->trace_mask = p -> trace_mask;        //
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
